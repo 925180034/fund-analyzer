@@ -191,3 +191,70 @@ async def get_fund_nav(
 
     await cache_set(cache_key, data, ttl=600)
     return {"data": data}
+
+
+@router.get("/manager/{manager_name}")
+async def get_manager_analysis(
+    manager_name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """基金经理分析"""
+    cache_key = f"fund:manager:{manager_name}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return {"data": cached}
+
+    # 查找该经理管理的所有基金
+    result = await db.execute(
+        select(Fund).where(Fund.manager.contains(manager_name))
+    )
+    funds = result.scalars().all()
+
+    if not funds:
+        return {"error": f"未找到基金经理: {manager_name}"}
+
+    fund_list = []
+    total_scale = 0.0
+
+    for f in funds:
+        # 获取最新净值
+        nav_result = await db.execute(
+            select(NavHistory)
+            .where(NavHistory.code == f.code)
+            .order_by(NavHistory.date.desc())
+            .limit(2)
+        )
+        nav_list = nav_result.scalars().all()
+        latest_nav = nav_list[0].nav if nav_list else None
+
+        fund_info = {
+            "code": f.code,
+            "name": f.name,
+            "type": f.type,
+            "scale": f.scale,
+            "latest_nav": latest_nav,
+        }
+        fund_list.append(fund_info)
+
+        if f.scale:
+            total_scale += f.scale
+
+    # 分析经理风格
+    type_counts = {}
+    for f in funds:
+        t = f.type or "未知"
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    primary_type = max(type_counts, key=type_counts.get) if type_counts else "未知"
+
+    data = {
+        "manager_name": manager_name,
+        "fund_count": len(funds),
+        "total_scale": round(total_scale, 2),
+        "primary_type": primary_type,
+        "type_distribution": type_counts,
+        "funds": fund_list,
+    }
+
+    await cache_set(cache_key, data, ttl=600)
+    return {"data": data}
