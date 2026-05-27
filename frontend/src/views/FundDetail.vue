@@ -1,344 +1,248 @@
 <template>
-  <div class="fund-detail" v-loading="loading">
-    <el-page-header @back="goBack" :content="fundInfo.name || '基金详情'" />
+  <div class="page">
+    <!-- 返回按钮 -->
+    <div class="back-bar" @click="goBack">
+      <span>‹</span>
+      <span>返回</span>
+    </div>
 
-    <el-row :gutter="20" class="info-row">
-      <el-col :span="16">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>{{ fundInfo.name }} ({{ fundInfo.code }})</span>
-              <el-tag v-if="fundInfo.type" type="info" size="small">{{ fundInfo.type }}</el-tag>
-            </div>
-          </template>
+    <div v-if="loading" class="ios-loading">加载中...</div>
 
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="基金代码">{{ fundInfo.code }}</el-descriptions-item>
-            <el-descriptions-item label="基金类型">{{ fundInfo.type || '--' }}</el-descriptions-item>
-            <el-descriptions-item label="最新净值">
-              <span :class="fundInfo.nav >= 0 ? 'price-up' : 'price-down'">
-                {{ fundInfo.nav ?? '--' }}
-              </span>
-            </el-descriptions-item>
-            <el-descriptions-item label="日涨跌幅">
-              <span :class="fundInfo.change >= 0 ? 'price-up' : 'price-down'">
-                {{ fundInfo.change != null ? (fundInfo.change > 0 ? '+' : '') + fundInfo.change + '%' : '--' }}
-              </span>
-            </el-descriptions-item>
-            <el-descriptions-item label="累计净值">{{ fundInfo.accNav ?? '--' }}</el-descriptions-item>
-            <el-descriptions-item label="净值日期">{{ fundInfo.navDate ?? '--' }}</el-descriptions-item>
-            <el-descriptions-item label="基金经理" :span="2">{{ fundInfo.manager || '--' }}</el-descriptions-item>
-            <el-descriptions-item label="基金公司" :span="2">{{ fundInfo.company || '--' }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
+    <template v-else-if="fund">
+      <!-- 基金基本信息 -->
+      <div class="ios-card">
+        <div class="fund-header">
+          <div class="fund-name">{{ fund.name }}</div>
+          <div class="fund-code">{{ fund.code }} · {{ fund.type }}</div>
+        </div>
+        <div class="fund-nav">
+          <div class="nav-value" :class="fund.change >= 0 ? 'price-up' : 'price-down'">
+            {{ fund.nav }}
+          </div>
+          <div class="nav-change" :class="fund.change >= 0 ? 'price-up' : 'price-down'">
+            {{ fund.change >= 0 ? '+' : '' }}{{ fund.change }}%
+          </div>
+        </div>
+        <div class="nav-date">净值日期: {{ fund.nav_date }}</div>
+      </div>
 
-      <el-col :span="8">
-        <el-card>
-          <template #header>
-            <span>📈 关键指标</span>
-          </template>
-          <div class="stats-list">
-            <div class="stat-item">
-              <span class="stat-label">近1月</span>
-              <span :class="(fundStats.month1 ?? 0) >= 0 ? 'price-up' : 'price-down'">
-                {{ fundStats.month1 != null ? (fundStats.month1 > 0 ? '+' : '') + fundStats.month1 + '%' : '--' }}
-              </span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">近3月</span>
-              <span :class="(fundStats.month3 ?? 0) >= 0 ? 'price-up' : 'price-down'">
-                {{ fundStats.month3 != null ? (fundStats.month3 > 0 ? '+' : '') + fundStats.month3 + '%' : '--' }}
-              </span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">近6月</span>
-              <span :class="(fundStats.month6 ?? 0) >= 0 ? 'price-up' : 'price-down'">
-                {{ fundStats.month6 != null ? (fundStats.month6 > 0 ? '+' : '') + fundStats.month6 + '%' : '--' }}
-              </span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">近1年</span>
-              <span :class="(fundStats.year1 ?? 0) >= 0 ? 'price-up' : 'price-down'">
-                {{ fundStats.year1 != null ? (fundStats.year1 > 0 ? '+' : '') + fundStats.year1 + '%' : '--' }}
-              </span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">近3年</span>
-              <span :class="(fundStats.year3 ?? 0) >= 0 ? 'price-up' : 'price-down'">
-                {{ fundStats.year3 != null ? (fundStats.year3 > 0 ? '+' : '') + fundStats.year3 + '%' : '--' }}
-              </span>
+      <!-- 阶段收益 -->
+      <div class="ios-card">
+        <div class="ios-card-header">阶段收益</div>
+        <div class="ios-stats">
+          <div class="ios-stat-item">
+            <div class="ios-stat-label">近1月</div>
+            <div class="ios-stat-value" :class="(fund.month1 ?? 0) >= 0 ? 'price-up' : 'price-down'">
+              {{ fund.month1 != null ? (fund.month1 > 0 ? '+' : '') + fund.month1 + '%' : '--' }}
             </div>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-card class="chart-card">
-      <template #header>
-        <div class="card-header">
-          <span>📊 单位净值走势</span>
-          <el-radio-group v-model="chartPeriod" size="small" @change="updateChart">
-            <el-radio-button label="1m">近1月</el-radio-button>
-            <el-radio-button label="3m">近3月</el-radio-button>
-            <el-radio-button label="6m">近6月</el-radio-button>
-            <el-radio-button label="1y">近1年</el-radio-button>
-            <el-radio-button label="all">全部</el-radio-button>
-          </el-radio-group>
+          <div class="ios-stat-item">
+            <div class="ios-stat-label">近3月</div>
+            <div class="ios-stat-value" :class="(fund.month3 ?? 0) >= 0 ? 'price-up' : 'price-down'">
+              {{ fund.month3 != null ? (fund.month3 > 0 ? '+' : '') + fund.month3 + '%' : '--' }}
+            </div>
+          </div>
+          <div class="ios-stat-item">
+            <div class="ios-stat-label">近6月</div>
+            <div class="ios-stat-value" :class="(fund.month6 ?? 0) >= 0 ? 'price-up' : 'price-down'">
+              {{ fund.month6 != null ? (fund.month6 > 0 ? '+' : '') + fund.month6 + '%' : '--' }}
+            </div>
+          </div>
+          <div class="ios-stat-item">
+            <div class="ios-stat-label">近1年</div>
+            <div class="ios-stat-value" :class="(fund.year1 ?? 0) >= 0 ? 'price-up' : 'price-down'">
+              {{ fund.year1 != null ? (fund.year1 > 0 ? '+' : '') + fund.year1 + '%' : '--' }}
+            </div>
+          </div>
         </div>
-      </template>
-      <div ref="chartRef" class="chart-container"></div>
-    </el-card>
+      </div>
+
+      <!-- 净值走势 -->
+      <div class="ios-card">
+        <div class="ios-card-header">净值走势</div>
+        <div class="ios-card-body">
+          <div ref="chartRef" class="chart-container"></div>
+        </div>
+      </div>
+
+      <!-- 基金信息 -->
+      <div class="ios-list">
+        <div class="ios-list-item">
+          <div class="item-content">
+            <div class="item-title">基金公司</div>
+          </div>
+          <div class="item-value">{{ fund.company || '--' }}</div>
+        </div>
+        <div class="ios-list-item">
+          <div class="item-content">
+            <div class="item-title">基金经理</div>
+          </div>
+          <div class="item-value">{{ fund.manager || '--' }}</div>
+        </div>
+        <div class="ios-list-item">
+          <div class="item-content">
+            <div class="item-title">累计净值</div>
+          </div>
+          <div class="item-value">{{ fund.acc_nav || '--' }}</div>
+        </div>
+      </div>
+    </template>
+
+    <div v-else class="ios-empty">
+      <div class="empty-icon">😕</div>
+      <div class="empty-text">未找到基金信息</div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import * as echarts from 'echarts'
 import { getFundDetail } from '../api/fund'
-import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
 
 const route = useRoute()
 const router = useRouter()
 
-const loading = ref(false)
-const fundInfo = ref({})
-const fundStats = ref({})
-const navHistory = ref([])
-const chartPeriod = ref('6m')
+const fund = ref(null)
+const loading = ref(true)
 const chartRef = ref(null)
 
-let chartInstance = null
+const goBack = () => router.push('/search')
 
-const goBack = () => {
-  router.push('/search')
-}
-
-const fetchDetail = async () => {
+onMounted(async () => {
   const code = route.params.code
-  loading.value = true
-
   try {
     const res = await getFundDetail(code)
-    const data = res.data
-
-    fundInfo.value = {
-      code: data.code || code,
-      name: data.name || '',
-      type: data.type || '',
-      nav: data.nav,
-      change: data.change,
-      accNav: data.acc_nav,
-      navDate: data.nav_date,
-      manager: data.manager || '',
-      company: data.company || ''
+    fund.value = res.data
+    
+    if (fund.value?.nav_history?.length > 0) {
+      await nextTick()
+      renderChart()
     }
-
-    fundStats.value = {
-      month1: data.month1,
-      month3: data.month3,
-      month6: data.month6,
-      year1: data.year1,
-      year3: data.year3
-    }
-
-    navHistory.value = data.nav_history || []
-
-    await nextTick()
-    initChart()
   } catch (err) {
-    console.error('获取基金详情失败:', err)
-    ElMessage.error('获取基金详情失败，请稍后重试')
+    console.error('获取详情失败:', err)
   } finally {
     loading.value = false
   }
-}
+})
 
-const getFilteredHistory = () => {
-  const history = navHistory.value
-  if (!history || history.length === 0) return { dates: [], values: [] }
-
-  const now = new Date()
-  let startDate = new Date(0)
-
-  switch (chartPeriod.value) {
-    case '1m':
-      startDate = new Date(now)
-      startDate.setMonth(startDate.getMonth() - 1)
-      break
-    case '3m':
-      startDate = new Date(now)
-      startDate.setMonth(startDate.getMonth() - 3)
-      break
-    case '6m':
-      startDate = new Date(now)
-      startDate.setMonth(startDate.getMonth() - 6)
-      break
-    case '1y':
-      startDate = new Date(now)
-      startDate.setFullYear(startDate.getFullYear() - 1)
-      break
-    case 'all':
-    default:
-      startDate = new Date(0)
-  }
-
-  const filtered = history.filter(item => new Date(item.date) >= startDate)
-
-  return {
-    dates: filtered.map(item => item.date),
-    values: filtered.map(item => item.nav)
-  }
-}
-
-const initChart = () => {
-  if (!chartRef.value) return
-
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-
-  chartInstance = echarts.init(chartRef.value)
-  updateChart()
-}
-
-const updateChart = () => {
-  if (!chartInstance) return
-
-  const { dates, values } = getFilteredHistory()
-
-  const option = {
+const renderChart = () => {
+  if (!chartRef.value || !fund.value?.nav_history) return
+  
+  const chart = echarts.init(chartRef.value)
+  const history = fund.value.nav_history
+  
+  chart.setOption({
+    backgroundColor: 'transparent',
+    grid: { top: 10, right: 10, bottom: 30, left: 50 },
     tooltip: {
       trigger: 'axis',
+      backgroundColor: 'rgba(255,255,255,0.95)',
+      borderColor: '#E5E5EA',
+      textStyle: { color: '#1C1C1E', fontSize: 13 },
       formatter: (params) => {
         const p = params[0]
-        return `${p.axisValue}<br/>单位净值: <b>${p.value}</b>`
+        return `${p.axisValue}<br/>净值: <b>${p.value}</b>`
       }
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '10%',
-      containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: dates,
-      axisLabel: {
-        rotate: 30,
-        fontSize: 11
-      }
+      data: history.map(h => h.date),
+      axisLine: { lineStyle: { color: '#E5E5EA' } },
+      axisLabel: { color: '#8E8E93', fontSize: 11 },
+      axisTick: { show: false }
     },
     yAxis: {
       type: 'value',
-      scale: true,
-      axisLabel: {
-        formatter: '{value}'
-      }
+      axisLine: { show: false },
+      axisLabel: { color: '#8E8E93', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#F2F2F7' } }
     },
-    series: [
-      {
-        name: '单位净值',
-        type: 'line',
-        data: values,
-        smooth: true,
-        symbol: 'none',
-        lineStyle: {
-          color: '#667eea',
-          width: 2
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(102,126,234,0.3)' },
-            { offset: 1, color: 'rgba(102,126,234,0.02)' }
-          ])
-        }
+    series: [{
+      data: history.map(h => h.nav),
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { color: '#007AFF', width: 2 },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(0,122,255,0.15)' },
+          { offset: 1, color: 'rgba(0,122,255,0)' }
+        ])
       }
-    ]
-  }
-
-  chartInstance.setOption(option, true)
-}
-
-onMounted(() => {
-  fetchDetail()
-  window.addEventListener('resize', handleResize)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (chartInstance) {
-    chartInstance.dispose()
-    chartInstance = null
-  }
-})
-
-const handleResize = () => {
-  if (chartInstance) {
-    chartInstance.resize()
-  }
+    }]
+  })
 }
 </script>
 
 <style scoped>
-.fund-detail {
-  max-width: 1200px;
-  margin: 0 auto;
+.page {
+  animation: fadeIn 0.3s ease;
 }
 
-.info-row {
-  margin-top: 20px;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.card-header {
+.back-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 600;
+  gap: 4px;
+  color: var(--ios-blue);
+  font-size: 17px;
+  margin-bottom: 16px;
+  cursor: pointer;
 }
 
-.chart-card {
-  margin-top: 20px;
+.back-bar span:first-child {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.fund-header {
+  padding: 16px;
+}
+
+.fund-name {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.fund-code {
+  font-size: 13px;
+  color: var(--ios-text3);
+  margin-top: 4px;
+}
+
+.fund-nav {
+  padding: 0 16px 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.nav-value {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+}
+
+.nav-change {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.nav-date {
+  padding: 0 16px 16px;
+  font-size: 13px;
+  color: var(--ios-text3);
 }
 
 .chart-container {
+  height: 250px;
   width: 100%;
-  height: 400px;
-}
-
-.stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.stat-item:last-child {
-  border-bottom: none;
-}
-
-.stat-label {
-  color: #606266;
-  font-size: 14px;
-}
-
-.price-up {
-  color: #f56c6c;
-  font-weight: 600;
-}
-
-.price-down {
-  color: #67c23a;
-  font-weight: 600;
 }
 </style>

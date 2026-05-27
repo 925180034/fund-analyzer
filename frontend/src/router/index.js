@@ -16,6 +16,11 @@ const routes = [
     component: () => import('../views/FundDetail.vue')
   },
   {
+    path: '/ranking',
+    name: 'Ranking',
+    component: () => import('../views/Ranking.vue')
+  },
+  {
     path: '/backtest',
     name: 'Backtest',
     component: () => import('../views/Backtest.vue')
@@ -29,11 +34,6 @@ const routes = [
     path: '/monitor',
     name: 'Monitor',
     component: () => import('../views/Monitor.vue')
-  },
-  {
-    path: '/ranking',
-    name: 'Ranking',
-    component: () => import('../views/Ranking.vue')
   }
 ]
 
