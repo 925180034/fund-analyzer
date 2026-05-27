@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金分析平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #08090a;
+            --bg-secondary: #0f1011;
+            --bg-tertiary: #191a1b;
+            --bg-elevated: #28282c;
+            --text-primary: #f7f8f8;
+            --text-secondary: #d0d6e0;
+            --text-tertiary: #8a8f98;
+            --text-quaternary: #62666d;
+            --accent: #5e6ad2;
+            --accent-hover: #7170ff;
+            --accent-light: #828fff;
+            --success: #27a644;
+            --success-light: #10b981;
+            --border-subtle: rgba(255,255,255,0.05);
+            --border-standard: rgba(255,255,255,0.08);
+            --border-primary: #23252a;
+            --shadow-elevated: rgba(0,0,0,0.4) 0px 2px 4px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.4px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 32px;
+            padding: 8px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .nav button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            background: transparent;
+            color: var(--text-tertiary);
+            font-family: inherit;
+        }
+
+        .nav button:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .nav button.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-standard);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            letter-spacing: -0.24px;
+            color: var(--text-primary);
+        }
+
+        /* Search */
+        .search-box {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-standard);
+            border-radius: 8px;
+            font-size: 15px;
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-quaternary);
+        }
+
+        .search-box button {
+            padding: 12px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .search-box button:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-quaternary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        td {
+            padding: 14px 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+            cursor: pointer;
+        }
+
+        .positive { color: #ef4444; }
+        .negative { color: var(--success); }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .metric-card .value {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.6px;
+            margin-bottom: 4px;
+        }
+
+        .metric-card .label {
+            font-size: 12px;
+            color: var(--text-quaternary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Charts */
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 24px 0;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+        }
+
+        .form-group select,
+        .form-group input {
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-standard);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-standard);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-elevated);
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(94, 106, 210, 0.15);
+            color: var(--accent-light);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Hidden */
+        .hidden { display: none; }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-quaternary);
+        }
+
+        .loading::after {
+            content: '';
+            display: block;
+            width: 32px;
+            height: 32px;
+            margin: 16px auto 0;
+            border: 2px solid var(--border-standard);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 0 60px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 600;
+            letter-spacing: -1.056px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-tertiary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-tertiary);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent);
+        }
+
+        .feature-card .icon {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+
+        .feature-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .feature-card p {
+            font-size: 13px;
+            color: var(--text-quaternary);
+            line-height: 1.5;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-light);
+        }
+
+        .status-badge.success::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--success-light);
+            border-radius: 50%;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 32px; letter-spacing: -0.704px; }
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .nav { flex-wrap: wrap; }
+            .nav button { flex: 1; min-width: calc(50% - 4px); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                <span>Fund Analyzer</span>
+            </div>
+            <div class="status-badge success">实时数据</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Hero -->
+        <div id="hero" class="hero">
+            <h1>智能基金分析平台</h1>
+            <p>基金筛选 · 定投回测 · 收益分析 · 风险评估</p>
+            <div class="search-box" style="max-width: 600px; margin: 0 auto;">
+                <input type="text" id="searchInput" placeholder="输入基金代码或名称搜索...">
+                <button onclick="searchFund()">搜索</button>
+            </div>
+            <div id="searchResults" style="max-width: 600px; margin: 20px auto 0;"></div>
+        </div>
+
+        <!-- Features -->
+        <div class="features-grid">
+            <div class="feature-card" onclick="showSection('ranking')">
+                <div class="icon">📈</div>
+                <h3>基金排行</h3>
+                <p>按类型筛选，查看热门基金排名</p>
+            </div>
+            <div class="feature-card" onclick="showSection('screen')">
+                <div class="icon">🔍</div>
+                <h3>智能筛选</h3>
+                <p>4433法则自动筛选优质基金</p>
+            </div>
+            <div class="feature-card" onclick="showSection('backtest')">
+                <div class="icon">💰</div>
+                <h3>定投回测</h3>
+                <p>模拟定投策略，验证历史收益</p>
+            </div>
+            <div class="feature-card" onclick="showSection('compare')">
+                <div class="icon">⚖️</div>
+                <h3>基金对比</h3>
+                <p>多维度横向对比分析</p>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav">
+            <button class="active" onclick="showSection('home')">🏠 首页</button>
+            <button onclick="showSection('ranking')">📈 排行</button>
+            <button onclick="showSection('screen')">🔍 筛选</button>
+            <button onclick="showSection('detail')">📋 详情</button>
+            <button onclick="showSection('backtest')">💰 回测</button>
+            <button onclick="showSection('compare')">⚖️ 对比</button>
+        </div>
+
+        <!-- Home -->
+        <div id="section-home" class="card hidden">
+            <h2>欢迎使用基金分析平台</h2>
+            <p style="color: var(--text-tertiary); margin-bottom: 24px;">帮助你分析和选择优质基金，制定定投策略</p>
+            
+            <div class="search-box">
+                <input type="text" id="homeSearchInput" placeholder="输入基金代码或名称搜索...">
+                <button onclick="searchFund('home')">搜索</button>
+            </div>
+            <div id="homeSearchResults"></div>
+        </div>
+
+        <!-- Ranking -->
+        <div id="section-ranking" class="card hidden">
+            <h2>📈 基金排行</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>基金类型</label>
+                    <select id="rankType" onchange="loadRanking()">
+                        <option value="全部">全部</option>
+                        <option value="股票型">股票型</option>
+                        <option value="混合型">混合型</option>
+                        <option value="债券型">债券型</option>
+                        <option value="指数型">指数型</option>
+                    </select>
+                </div>
+            </div>
+            <div id="rankingTable"></div>
+        </div>
+
+        <!-- Screen -->
+        <div id="section-screen" class="card hidden">
+            <h2>🔍 基金筛选（4433法则）</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>基金类型</label>
+                    <select id="screenType">
+                        <option value="全部">全部</option>
+                        <option value="股票型">股票型</option>
+                        <option value="混合型">混合型</option>
+                        <option value="债券型">债券型</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>最低年收益 (%)</label>
+                    <input type="number" id="minReturn" value="10" min="0">
+                </div>
+                <div class="form-group">
+                    <label>最低4433分数</label>
+                    <select id="minScore">
+                        <option value="25">25分（满足1项）</option>
+                        <option value="50">50分（满足2项）</option>
+                        <option value="75" selected>75分（满足3项）</option>
+                        <option value="100">100分（满足全部）</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="screenFunds()">开始筛选</button>
+            <div id="screenResults" style="margin-top: 24px;"></div>
+        </div>
+
+        <!-- Detail -->
+        <div id="section-detail" class="card hidden">
+            <h2>📋 基金详情</h2>
+            <div class="search-box">
+                <input type="text" id="detailCode" placeholder="输入基金代码...">
+                <button onclick="loadFundDetail()">查询</button>
+            </div>
+            <div id="fundDetail"></div>
+        </div>
+
+        <!-- Backtest -->
+        <div id="section-backtest" class="card hidden">
+            <h2>💰 定投回测</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>基金代码</label>
+                    <input type="text" id="btCode" placeholder="如 110011">
+                </div>
+                <div class="form-group">
+                    <label>每次金额 (元)</label>
+                    <input type="number" id="btAmount" value="1000" min="100">
+                </div>
+                <div class="form-group">
+                    <label>定投频率</label>
+                    <select id="btFrequency">
+                        <option value="monthly">每月</option>
+                        <option value="biweekly">每两周</option>
+                        <option value="weekly">每周</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>投资策略</label>
+                    <select id="btStrategy">
+                        <option value="fixed">普通定投</option>
+                        <option value="smart">智能定投</option>
+                        <option value="compare">策略对比</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>开始日期</label>
+                    <input type="date" id="btStartDate" value="2020-01-01">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="runBacktest()">开始回测</button>
+            <div id="backtestResults" style="margin-top: 24px;"></div>
+        </div>
+
+        <!-- Compare -->
+        <div id="section-compare" class="card hidden">
+            <h2>⚖️ 基金对比</h2>
+            <div class="form-group">
+                <label>输入基金代码（每行一个，至少2个）</label>
+                <textarea id="compareCodes" rows="4" placeholder="110011&#10;005827&#10;161725" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-standard); border-radius: 8px; color: var(--text-primary); font-family: inherit; font-size: 14px;"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="compareFunds()" style="margin-top: 12px;">开始对比</button>
+            <div id="compareResults" style="margin-top: 24px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // 页面切换
+        function showSection(section) {
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('section-' + section).classList.remove('hidden');
+            document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (section === 'home') {
+                document.getElementById('hero').classList.remove('hidden');
+            } else {
+                document.getElementById('hero').classList.add('hidden');
+            }
+            
+            if (section === 'ranking') loadRanking();
+        }
+
+        // 搜索基金
+        async function searchFund(source) {
+            const inputId = source === 'home' ? 'homeSearchInput' : 'searchInput';
+            const resultId = source === 'home' ? 'homeSearchResults' : 'searchResults';
+            const keyword = document.getElementById(inputId).value;
+            if (!keyword) return;
+            
+            const res = await fetch('/api/search?keyword=' + encodeURIComponent(keyword));
+            const data = await res.json();
+            
+            let html = '<table><tr><th>代码</th><th>名称</th><th>类型</th><th>净值</th><th>日涨幅</th></tr>';
+            data.results.forEach(fund => {
+                const growthClass = fund.day_growth >= 0 ? 'positive' : 'negative';
+                html += `<tr onclick="viewFundDetail('${fund.code}')">
+                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">${fund.code}</td>
+                    <td style="font-weight: 500;">${fund.name}</td>
+                    <td><span class="tag">${fund.type}</span></td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${fund.nav}</td>
+                    <td class="${growthClass}" style="font-family: 'JetBrains Mono', monospace;">${fund.day_growth}%</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById(resultId).innerHTML = html;
+        }
+
+        // 查看基金详情
+        function viewFundDetail(code) {
+            document.getElementById('detailCode').value = code;
+            showSection('detail');
+            document.querySelectorAll('.nav button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.includes('详情')) btn.classList.add('active');
+            });
+            document.getElementById('hero').classList.add('hidden');
+            loadFundDetail();
+        }
+
+        // 加载基金详情
+        async function loadFundDetail() {
+            const code = document.getElementById('detailCode').value;
+            if (!code) return;
+            
+            document.getElementById('fundDetail').innerHTML = '<div class="loading">加载中...</div>';
+            
+            const res = await fetch('/api/fund/' + code);
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('fundDetail').innerHTML = '<p style="color: #ef4444;">' + data.error + '</p>';
+                return;
+            }
+            
+            const m = data.metrics;
+            let html = `
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="value">${m.total_return}%</div>
+                        <div class="label">总收益率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${m.annual_return}%</div>
+                        <div class="label">年化收益率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value" style="color: #ef4444;">${m.max_drawdown}%</div>
+                        <div class="label">最大回撤</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${m.sharpe}</div>
+                        <div class="label">夏普比率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${m.volatility}%</div>
+                        <div class="label">波动率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${m.total_days}</div>
+                        <div class="label">投资天数</div>
+                    </div>
+                </div>
+                <div id="navChart" class="chart-container"></div>
+            `;
+            
+            document.getElementById('fundDetail').innerHTML = html;
+            
+            // 绘制净值走势图
+            const chart = echarts.init(document.getElementById('navChart'));
+            const dates = data.nav_history.map(item => item.date);
+            const navs = data.nav_history.map(item => item.nav);
+            
+            chart.setOption({
+                backgroundColor: 'transparent',
+                title: { 
+                    text: '净值走势', 
+                    left: 'center',
+                    textStyle: { color: '#f7f8f8', fontSize: 14, fontWeight: 500 }
+                },
+                tooltip: { 
+                    trigger: 'axis',
+                    backgroundColor: '#191a1b',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    textStyle: { color: '#f7f8f8' }
+                },
+                xAxis: { 
+                    type: 'category', 
+                    data: dates,
+                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+                    axisLabel: { color: '#62666d' }
+                },
+                yAxis: { 
+                    type: 'value', 
+                    name: '净值',
+                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+                    axisLabel: { color: '#62666d' },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+                },
+                series: [{
+                    data: navs,
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: { 
+                        color: {
+                            type: 'linear',
+                            x: 0, y: 0, x2: 0, y2: 1,
+                            colorStops: [
+                                { offset: 0, color: 'rgba(94, 106, 210, 0.3)' },
+                                { offset: 1, color: 'rgba(94, 106, 210, 0)' }
+                            ]
+                        }
+                    },
+                    itemStyle: { color: '#5e6ad2' },
+                    lineStyle: { width: 2 }
+                }]
+            });
+        }
+
+        // 加载基金排行
+        async function loadRanking() {
+            const type = document.getElementById('rankType').value;
+            document.getElementById('rankingTable').innerHTML = '<div class="loading">加载中...</div>';
+            
+            const res = await fetch('/api/ranking?type=' + type);
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('rankingTable').innerHTML = '<p style="color: #ef4444;">' + data.error + '</p>';
+                return;
+            }
+            
+            let html = '<table><tr><th>排名</th><th>代码</th><th>名称</th><th>净值</th><th>今年收益</th></tr>';
+            data.results.forEach((fund, index) => {
+                const growthClass = fund.year_growth >= 0 ? 'positive' : 'negative';
+                html += `<tr onclick="viewFundDetail('${fund.code}')">
+                    <td style="font-family: 'JetBrains Mono', monospace; color: var(--text-quaternary);">${index + 1}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">${fund.code}</td>
+                    <td style="font-weight: 500;">${fund.name}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${fund.nav}</td>
+                    <td class="${growthClass}" style="font-family: 'JetBrains Mono', monospace;">${fund.year_growth}%</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('rankingTable').innerHTML = html;
+        }
+
+        // 基金筛选
+        async function screenFunds() {
+            const type = document.getElementById('screenType').value;
+            const minReturn = document.getElementById('minReturn').value;
+            const minScore = document.getElementById('minScore').value;
+            
+            document.getElementById('screenResults').innerHTML = '<div class="loading">筛选中...</div>';
+            
+            const res = await fetch(`/api/screen?type=${type}&min_return=${minReturn}&min_score=${minScore}`);
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('screenResults').innerHTML = '<p style="color: #ef4444;">' + data.error + '</p>';
+                return;
+            }
+            
+            let html = '<p style="margin-bottom: 16px; color: var(--text-quaternary);">找到 ' + data.results.length + ' 只基金</p>';
+            html += '<table><tr><th>代码</th><th>名称</th><th>类型</th><th>净值</th><th>今年收益</th></tr>';
+            data.results.forEach(fund => {
+                const growthClass = fund.year_growth >= 0 ? 'positive' : 'negative';
+                html += `<tr onclick="viewFundDetail('${fund.code}')">
+                    <td style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">${fund.code}</td>
+                    <td style="font-weight: 500;">${fund.name}</td>
+                    <td><span class="tag">${fund.type}</span></td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${fund.nav}</td>
+                    <td class="${growthClass}" style="font-family: 'JetBrains Mono', monospace;">${fund.year_growth}%</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('screenResults').innerHTML = html;
+        }
+
+        // 定投回测
+        async function runBacktest() {
+            const code = document.getElementById('btCode').value;
+            const amount = document.getElementById('btAmount').value;
+            const frequency = document.getElementById('btFrequency').value;
+            const strategy = document.getElementById('btStrategy').value;
+            const startDate = document.getElementById('btStartDate').value;
+            
+            if (!code) {
+                alert('请输入基金代码');
+                return;
+            }
+            
+            document.getElementById('backtestResults').innerHTML = '<div class="loading">回测中...</div>';
+            
+            const res = await fetch('/api/backtest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, amount, frequency, strategy, start_date: startDate })
+            });
+            
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('backtestResults').innerHTML = '<p style="color: #ef4444;">' + data.error + '</p>';
+                return;
+            }
+            
+            // 策略对比模式
+            if (strategy === 'compare') {
+                displayStrategyComparison(data);
+                return;
+            }
+            
+            const s = data.summary;
+            let html = `
+                <h3 style="margin-bottom: 20px;">回测结果</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="value">${s.total_invest.toLocaleString()}元</div>
+                        <div class="label">总投入</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${s.final_value.toLocaleString()}元</div>
+                        <div class="label">最终价值</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value ${s.total_profit >= 0 ? 'positive' : 'negative'}">${s.total_profit.toLocaleString()}元</div>
+                        <div class="label">总收益</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${s.total_return}%</div>
+                        <div class="label">总收益率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${s.annual_return}%</div>
+                        <div class="label">年化收益率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value" style="color: #ef4444;">${s.max_drawdown}%</div>
+                        <div class="label">最大回撤</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${s.sharpe}</div>
+                        <div class="label">夏普比率</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="value">${s.invest_count}次</div>
+                        <div class="label">定投次数</div>
+                    </div>
+                </div>
+                <div id="backtestChart" class="chart-container"></div>
+            `;
+            
+            document.getElementById('backtestResults').innerHTML = html;
+            
+            // 绘制收益曲线
+            if (data.value_history && data.value_history.length > 0) {
+                const chart = echarts.init(document.getElementById('backtestChart'));
+                const dates = data.value_history.map(item => item.date);
+                const values = data.value_history.map(item => item.value);
+                const invests = data.value_history.map(item => item.invest);
+                
+                chart.setOption({
+                    backgroundColor: 'transparent',
+                    title: { 
+                        text: '资产走势', 
+                        left: 'center',
+                        textStyle: { color: '#f7f8f8', fontSize: 14, fontWeight: 500 }
+                    },
+                    tooltip: { 
+                        trigger: 'axis',
+                        backgroundColor: '#191a1b',
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        textStyle: { color: '#f7f8f8' }
+                    },
+                    legend: { 
+                        data: ['资产价值', '累计投入'], 
+                        bottom: 0,
+                        textStyle: { color: '#8a8f98' }
+                    },
+                    xAxis: { 
+                        type: 'category', 
+                        data: dates,
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+                        axisLabel: { color: '#62666d' }
+                    },
+                    yAxis: { 
+                        type: 'value', 
+                        name: '金额（元）',
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+                        axisLabel: { color: '#62666d' },
+                        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    series: [
+                        { 
+                            name: '资产价值', 
+                            data: values, 
+                            type: 'line', 
+                            smooth: true, 
+                            itemStyle: { color: '#5e6ad2' },
+                            lineStyle: { width: 2 }
+                        },
+                        { 
+                            name: '累计投入', 
+                            data: invests, 
+                            type: 'line', 
+                            smooth: true, 
+                            lineStyle: { type: 'dashed', color: '#62666d' }, 
+                            itemStyle: { color: '#62666d' }
+                        }
+                    ]
+                });
+            }
+        }
+
+        // 显示策略对比
+        function displayStrategyComparison(data) {
+            let html = '<h3 style="margin-bottom: 20px;">策略对比结果</h3>';
+            
+            const strategies = [
+                { key: 'monthly', name: '每月定投' },
+                { key: 'weekly', name: '每周定投' },
+                { key: 'smart', name: '智能定投' }
+            ];
+            
+            html += '<div class="metrics-grid">';
+            strategies.forEach(st => {
+                const s = data[st.key]?.summary;
+                if (!s) return;
+                
+                html += `
+                    <div class="metric-card">
+                        <div class="value">${s.total_return}%</div>
+                        <div class="label">${st.name} - 总收益率</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            html += '<table><tr><th>策略</th><th>总投入</th><th>最终价值</th><th>总收益</th><th>收益率</th><th>年化收益</th></tr>';
+            strategies.forEach(st => {
+                const s = data[st.key]?.summary;
+                if (!s) return;
+                
+                const profitClass = s.total_profit >= 0 ? 'positive' : 'negative';
+                html += `<tr>
+                    <td style="font-weight: 500;">${st.name}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${s.total_invest.toLocaleString()}元</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${s.final_value.toLocaleString()}元</td>
+                    <td class="${profitClass}" style="font-family: 'JetBrains Mono', monospace;">${s.total_profit.toLocaleString()}元</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${s.total_return}%</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${s.annual_return}%</td>
+                </tr>`;
+            });
+            html += '</table>';
+            
+            document.getElementById('backtestResults').innerHTML = html;
+        }
+
+        // 基金对比
+        async function compareFunds() {
+            const codesText = document.getElementById('compareCodes').value;
+            const codes = codesText.split('\n').map(c => c.trim()).filter(c => c);
+            
+            if (codes.length < 2) {
+                alert('请输入至少2个基金代码');
+                return;
+            }
+            
+            document.getElementById('compareResults').innerHTML = '<div class="loading">对比中...</div>';
+            
+            const res = await fetch('/api/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codes })
+            });
+            
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('compareResults').innerHTML = '<p style="color: #ef4444;">' + data.error + '</p>';
+                return;
+            }
+            
+            let html = '<h3 style="margin-bottom: 20px;">对比结果</h3>';
+            html += '<table><tr><th>基金代码</th><th>总收益率</th><th>年化收益</th><th>最大回撤</th><th>夏普比率</th><th>波动率</th></tr>';
+            
+            Object.entries(data.funds).forEach(([code, metrics]) => {
+                html += `<tr>
+                    <td style="font-weight: 500; font-family: 'JetBrains Mono', monospace;">${code}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${metrics.total_return}%</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${metrics.annual_return}%</td>
+                    <td style="font-family: 'JetBrains Mono', monospace; color: #ef4444;">${metrics.max_drawdown}%</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${metrics.sharpe}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${metrics.volatility}%</td>
+                </tr>`;
+            });
+            html += '</table>';
+            
+            document.getElementById('compareResults').innerHTML = html;
+        }
+
+        // 回车搜索
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchFund();
+        });
+        
+        document.getElementById('homeSearchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchFund('home');
+        });
+    </script>
+</body>
+</html>
