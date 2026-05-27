@@ -2,27 +2,22 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from typing import Optional
+from datetime import datetime, timedelta
 
 from backend.database import get_db
 from backend.models import Fund, NavHistory, FundRanking
 from backend.services.cache_manager import cache_get, cache_set
-from backend.services.risk_analyzer import max_drawdown, sharpe_ratio, annual_return, volatility
 
 router = APIRouter(prefix="/fund", tags=["基金"])
 
 
 @router.get("/search")
 async def search_funds(
-    keyword: str = Query(..., description="搜索关键词（基金代码或名称）"),
-    fund_type: Optional[str] = Query(None, description="基金类型"),
+    keyword: str = Query(..., description="搜索关键词"),
+    fund_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """搜索基金"""
-    cache_key = f"fund:search:{keyword}:{fund_type}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return {"data": cached}
-
     query = select(Fund).where(
         or_(Fund.code.contains(keyword), Fund.name.contains(keyword))
     )
@@ -32,229 +27,136 @@ async def search_funds(
     result = await db.execute(query.limit(50))
     funds = result.scalars().all()
 
-    data = [
-        {
-            "code": f.code,
-            "name": f.name,
-            "type": f.type,
-            "company": f.company,
-            "manager": f.manager,
-            "scale": f.scale,
-        }
-        for f in funds
-    ]
-
-    await cache_set(cache_key, data, ttl=300)
-    return {"data": data}
+    return {
+        "data": [
+            {"code": f.code, "name": f.name, "type": f.type, "company": f.company, "manager": f.manager, "scale": f.scale}
+            for f in funds
+        ]
+    }
 
 
 @router.get("/detail/{code}")
-async def get_fund_detail(
-    code: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """获取基金详情"""
-    cache_key = f"fund:detail:{code}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return {"data": cached}
-
-    # 获取基本信息
+async def get_fund_detail(code: str, db: AsyncSession = Depends(get_db)):
+    """获取基金详情（含净值历史和阶段收益）"""
+    # 基本信息
     result = await db.execute(select(Fund).where(Fund.code == code))
     fund = result.scalar_one_or_none()
     if not fund:
         return {"error": "基金不存在"}
 
-    # 获取最新净值
+    # 净值历史
     nav_result = await db.execute(
-        select(NavHistory)
-        .where(NavHistory.code == code)
-        .order_by(NavHistory.date.desc())
-        .limit(1)
+        select(NavHistory).where(NavHistory.code == code).order_by(NavHistory.date.asc())
     )
-    latest_nav = nav_result.scalar_one_or_none()
+    nav_list = nav_result.scalars().all()
 
-    # 获取排名
-    rank_result = await db.execute(
-        select(FundRanking)
-        .where(FundRanking.code == code)
-        .order_by(FundRanking.rank_date.desc())
-        .limit(1)
-    )
-    ranking = rank_result.scalar_one_or_none()
+    if not nav_list:
+        return {"error": "无净值数据"}
 
-    data = {
+    # 最新净值
+    latest = nav_list[-1]
+    prev = nav_list[-2] if len(nav_list) > 1 else latest
+    change = round((float(latest.nav) - float(prev.nav)) / float(prev.nav) * 100, 2) if prev.nav else 0
+
+    # 计算阶段收益
+    now = datetime.now().date()
+    def get_return(days):
+        target_date = now - timedelta(days=days)
+        for n in nav_list:
+            if n.date >= target_date:
+                start_nav = float(n.nav)
+                end_nav = float(latest.nav)
+                return round((end_nav - start_nav) / start_nav * 100, 2)
+        return None
+
+    # 净值历史数据
+    nav_history = [{"date": str(n.date), "nav": float(n.nav)} for n in nav_list[-500:]]
+
+    return {
         "code": fund.code,
         "name": fund.name,
         "type": fund.type,
         "company": fund.company,
         "manager": fund.manager,
-        "establish_date": str(fund.establish_date) if fund.establish_date else None,
-        "scale": fund.scale,
-        "fee_buy": fund.fee_buy,
-        "fee_sell": fund.fee_sell,
-        "fee_manage": fund.fee_manage,
-        "latest_nav": {
-            "date": str(latest_nav.date) if latest_nav else None,
-            "nav": latest_nav.nav if latest_nav else None,
-            "acc_nav": latest_nav.acc_nav if latest_nav else None,
-            "growth": latest_nav.growth if latest_nav else None,
-        },
-        "ranking": {
-            "rank_3m": ranking.rank_3m if ranking else None,
-            "rank_6m": ranking.rank_6m if ranking else None,
-            "rank_1y": ranking.rank_1y if ranking else None,
-            "rank_3y": ranking.rank_3y if ranking else None,
-        } if ranking else None,
+        "nav": float(latest.nav),
+        "change": change,
+        "acc_nav": float(latest.acc_nav) if latest.acc_nav else None,
+        "nav_date": str(latest.date),
+        "month1": get_return(30),
+        "month3": get_return(90),
+        "month6": get_return(180),
+        "year1": get_return(365),
+        "year3": get_return(1095),
+        "nav_history": nav_history,
     }
-
-    await cache_set(cache_key, data, ttl=600)
-    return {"data": data}
 
 
 @router.get("/ranking")
 async def get_fund_ranking(
-    fund_type: str = Query("全部", description="基金类型"),
-    sort_by: str = Query("rank_1y", description="排序字段"),
+    fund_type: str = Query("全部"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取基金排行"""
-    cache_key = f"fund:ranking:{fund_type}:{sort_by}:{page}:{size}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return {"data": cached}
-
-    query = select(FundRanking).where(FundRanking.type == fund_type)
-
-    # 排序
-    sort_column = getattr(FundRanking, sort_by, FundRanking.rank_1y)
-    query = query.order_by(sort_column.asc())
-
-    # 分页
+    """基金排行"""
+    query = select(Fund).where(Fund.type == fund_type) if fund_type != "全部" else select(Fund)
+    query = query.order_by(Fund.scale.desc().nullslast())
     offset = (page - 1) * size
     query = query.offset(offset).limit(size)
 
     result = await db.execute(query)
-    rankings = result.scalars().all()
+    funds = result.scalars().all()
 
-    data = [
-        {
-            "code": r.code,
-            "rank_date": str(r.rank_date),
-            "rank_3m": r.rank_3m,
-            "rank_6m": r.rank_6m,
-            "rank_1y": r.rank_1y,
-            "rank_3y": r.rank_3y,
-            "total_count": r.total_count,
-        }
-        for r in rankings
-    ]
-
-    await cache_set(cache_key, data, ttl=600)
-    return {"data": data, "page": page, "size": size}
+    return {
+        "data": [
+            {"code": f.code, "name": f.name, "type": f.type, "manager": f.manager, "scale": f.scale}
+            for f in funds
+        ],
+        "page": page,
+        "size": size,
+    }
 
 
 @router.get("/nav/{code}")
-async def get_fund_nav(
-    code: str,
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db),
-):
+async def get_fund_nav(code: str, db: AsyncSession = Depends(get_db)):
     """获取基金净值历史"""
-    cache_key = f"fund:nav:{code}:{start_date}:{end_date}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return {"data": cached}
-
-    query = select(NavHistory).where(NavHistory.code == code)
-    if start_date:
-        query = query.where(NavHistory.date >= start_date)
-    if end_date:
-        query = query.where(NavHistory.date <= end_date)
-
-    query = query.order_by(NavHistory.date.asc())
-    result = await db.execute(query.limit(1000))
+    result = await db.execute(
+        select(NavHistory).where(NavHistory.code == code).order_by(NavHistory.date.asc()).limit(1000)
+    )
     nav_list = result.scalars().all()
 
-    data = [
-        {
-            "date": str(n.date),
-            "nav": n.nav,
-            "acc_nav": n.acc_nav,
-            "growth": n.growth,
-        }
-        for n in nav_list
-    ]
-
-    await cache_set(cache_key, data, ttl=600)
-    return {"data": data}
+    return {
+        "data": [{"date": str(n.date), "nav": float(n.nav), "growth": float(n.growth) if n.growth else 0} for n in nav_list]
+    }
 
 
 @router.get("/manager/{manager_name}")
-async def get_manager_analysis(
-    manager_name: str,
-    db: AsyncSession = Depends(get_db),
-):
+async def get_manager_analysis(manager_name: str, db: AsyncSession = Depends(get_db)):
     """基金经理分析"""
-    cache_key = f"fund:manager:{manager_name}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return {"data": cached}
-
-    # 查找该经理管理的所有基金
-    result = await db.execute(
-        select(Fund).where(Fund.manager.contains(manager_name))
-    )
+    result = await db.execute(select(Fund).where(Fund.manager.contains(manager_name)))
     funds = result.scalars().all()
 
     if not funds:
         return {"error": f"未找到基金经理: {manager_name}"}
 
     fund_list = []
-    total_scale = 0.0
-
     for f in funds:
-        # 获取最新净值
         nav_result = await db.execute(
-            select(NavHistory)
-            .where(NavHistory.code == f.code)
-            .order_by(NavHistory.date.desc())
-            .limit(2)
+            select(NavHistory).where(NavHistory.code == f.code).order_by(NavHistory.date.desc()).limit(1)
         )
-        nav_list = nav_result.scalars().all()
-        latest_nav = nav_list[0].nav if nav_list else None
-
-        fund_info = {
+        latest_nav = nav_result.scalar_one_or_none()
+        fund_list.append({
             "code": f.code,
             "name": f.name,
             "type": f.type,
             "scale": f.scale,
-            "latest_nav": latest_nav,
+            "latest_nav": float(latest_nav.nav) if latest_nav else None,
+        })
+
+    return {
+        "data": {
+            "manager_name": manager_name,
+            "fund_count": len(funds),
+            "funds": fund_list,
         }
-        fund_list.append(fund_info)
-
-        if f.scale:
-            total_scale += f.scale
-
-    # 分析经理风格
-    type_counts = {}
-    for f in funds:
-        t = f.type or "未知"
-        type_counts[t] = type_counts.get(t, 0) + 1
-
-    primary_type = max(type_counts, key=type_counts.get) if type_counts else "未知"
-
-    data = {
-        "manager_name": manager_name,
-        "fund_count": len(funds),
-        "total_scale": round(total_scale, 2),
-        "primary_type": primary_type,
-        "type_distribution": type_counts,
-        "funds": fund_list,
     }
-
-    await cache_set(cache_key, data, ttl=600)
-    return {"data": data}
